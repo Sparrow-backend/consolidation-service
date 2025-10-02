@@ -14,11 +14,11 @@ app.use(cors({
 app.use(express.json())
 
 app.get('/', (req, res) => {
-    res.json({message: "Sparrow: API Gateway"})
+    res.json({message: "Sparrow: Consolidation Service"})
 })
 
 app.get('/health', (req, res) => {
-    res.json({message: "API Gateway is running.."})
+    res.json({message: "Consolidation Service is running.."})
 })
 
 
