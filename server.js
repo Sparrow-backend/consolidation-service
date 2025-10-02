@@ -18,6 +18,7 @@ mongoose.connection.on('error', () => {
     console.error('Error in connecting with MongoDB')
 })
 
+
 async function createServer() {
     try {
         mongoose.connect(MONGODB_URI)
