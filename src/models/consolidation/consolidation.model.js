@@ -1,4 +1,5 @@
 const Consolidation = require('./consolidation.mongo');
+const fetch = require('node-fetch');
 
 async function createConsolidation(consolidationData) {
     const consolidation = new Consolidation({
@@ -10,13 +11,29 @@ async function createConsolidation(consolidationData) {
         }]
     });
     
-    return await consolidation.save();
+    await consolidation.save();
+    
+    // Send notification to creator
+    if (consolidationData.createdBy) {
+        await sendNotification({
+            userId: consolidationData.createdBy,
+            type: 'consolidation_update',
+            title: 'Consolidation Created',
+            message: `Consolidation ${consolidation.referenceCode} has been created successfully`,
+            entityType: 'Consolidation',
+            entityId: consolidation._id,
+            channels: ['in_app', 'email']
+        });
+    }
+    
+    return consolidation;
 }
 
 async function findConsolidationById(id) {
     return await Consolidation.findById(id)
         .populate('parcels')
         .populate('createdBy', 'name email')
+        .populate('assignedDriver', 'userName entityId')
         .populate('warehouseId', 'name location');
 }
 
@@ -24,6 +41,7 @@ async function findConsolidationByReferenceCode(referenceCode) {
     return await Consolidation.findOne({ referenceCode })
         .populate('parcels')
         .populate('createdBy', 'name email')
+        .populate('assignedDriver', 'userName entityId')
         .populate('warehouseId', 'name location');
 }
 
@@ -31,6 +49,7 @@ async function findConsolidationByMasterTracking(masterTrackingNumber) {
     return await Consolidation.findOne({ masterTrackingNumber })
         .populate('parcels')
         .populate('createdBy', 'name email')
+        .populate('assignedDriver', 'userName entityId')
         .populate('warehouseId', 'name location');
 }
 
@@ -49,28 +68,74 @@ async function getAllConsolidations(filters = {}) {
         query.createdBy = filters.createdBy;
     }
     
+    if (filters.assignedDriver) {
+        query.assignedDriver = filters.assignedDriver;
+    }
+    
     return await Consolidation.find(query)
         .populate('parcels')
         .populate('createdBy', 'name email')
+        .populate('assignedDriver', 'userName entityId')
         .populate('warehouseId', 'name location')
-        .sort({ createdAt: -1 });
+        .sort({ createdTimestamp: -1 });
 }
 
-async function updateConsolidationStatus(id, status, note = '') {
-    const consolidation = await Consolidation.findById(id);
+async function updateConsolidationStatus(id, status, note = '', location = null) {
+    const consolidation = await Consolidation.findById(id).populate('createdBy assignedDriver');
     
     if (!consolidation) {
         throw new Error('Consolidation not found');
     }
     
+    const oldStatus = consolidation.status;
     consolidation.status = status;
-    consolidation.statusHistory.push({
+    
+    const historyEntry = {
         status,
         timestamp: new Date(),
         note
-    });
+    };
     
-    return await consolidation.save();
+    if (location) {
+        historyEntry.location = location;
+    }
+    
+    consolidation.statusHistory.push(historyEntry);
+    
+    await consolidation.save();
+    
+    // Send notifications based on status change
+    const notifications = [];
+    
+    // Notify creator
+    if (consolidation.createdBy && oldStatus !== status) {
+        notifications.push(sendNotification({
+            userId: consolidation.createdBy._id,
+            type: 'consolidation_update',
+            title: 'Consolidation Status Updated',
+            message: `Consolidation ${consolidation.referenceCode} status changed from ${oldStatus} to ${status}`,
+            entityType: 'Consolidation',
+            entityId: consolidation._id,
+            channels: ['in_app', 'email']
+        }));
+    }
+    
+    // Notify driver for specific statuses
+    if (consolidation.assignedDriver && ['in_transit', 'out_for_delivery'].includes(status)) {
+        notifications.push(sendNotification({
+            userId: consolidation.assignedDriver._id,
+            type: 'consolidation_update',
+            title: 'Delivery Update',
+            message: `Consolidation ${consolidation.referenceCode} is now ${status.replace('_', ' ')}`,
+            entityType: 'Consolidation',
+            entityId: consolidation._id,
+            channels: ['in_app', 'push']
+        }));
+    }
+    
+    await Promise.all(notifications);
+    
+    return consolidation;
 }
 
 async function addParcelToConsolidation(consolidationId, parcelId) {
@@ -119,6 +184,71 @@ async function consolidationExists(referenceCode) {
     return !!consolidation;
 }
 
+async function assignDriverToConsolidation(consolidationId, driverId) {
+    const consolidation = await Consolidation.findById(consolidationId).populate('createdBy');
+    
+    if (!consolidation) {
+        throw new Error('Consolidation not found');
+    }
+    
+    consolidation.assignedDriver = driverId;
+    consolidation.status = 'assigned_to_driver';
+    consolidation.statusHistory.push({
+        status: 'assigned_to_driver',
+        timestamp: new Date(),
+        note: 'Driver assigned to consolidation'
+    });
+    
+    await consolidation.save();
+    
+    // Notify driver
+    await sendNotification({
+        userId: driverId,
+        type: 'consolidation_update',
+        title: 'New Delivery Assigned',
+        message: `You have been assigned consolidation ${consolidation.referenceCode}`,
+        entityType: 'Consolidation',
+        entityId: consolidation._id,
+        channels: ['in_app', 'push', 'email']
+    });
+    
+    // Notify creator
+    if (consolidation.createdBy) {
+        await sendNotification({
+            userId: consolidation.createdBy._id,
+            type: 'consolidation_update',
+            title: 'Driver Assigned',
+            message: `Driver has been assigned to consolidation ${consolidation.referenceCode}`,
+            entityType: 'Consolidation',
+            entityId: consolidation._id,
+            channels: ['in_app']
+        });
+    }
+    
+    return consolidation;
+}
+
+// Helper function to send notifications
+async function sendNotification(notificationData) {
+    try {
+        const NOTIFICATION_SERVICE_URL = process.env.NOTIFICATION_SERVICE_URL || 'https://notification-service.vercel.app';
+        
+        const response = await fetch(`${NOTIFICATION_SERVICE_URL}/api/notifications`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(notificationData)
+        });
+        
+        if (!response.ok) {
+            console.error('Failed to send notification:', await response.text());
+        }
+    } catch (error) {
+        console.error('Error sending notification:', error);
+    }
+}
+
 module.exports = {
     createConsolidation,
     findConsolidationById,
@@ -130,5 +260,6 @@ module.exports = {
     removeParcelFromConsolidation,
     updateConsolidation,
     deleteConsolidation,
-    consolidationExists
+    consolidationExists,
+    assignDriverToConsolidation
 };

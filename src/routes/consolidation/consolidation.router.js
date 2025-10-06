@@ -6,6 +6,7 @@ const {
     httpGetConsolidationByReference,
     httpGetConsolidationByTracking,
     httpUpdateConsolidationStatus,
+    httpAssignDriverToConsolidation,
     httpAddParcelToConsolidation,
     httpRemoveParcelFromConsolidation,
     httpUpdateConsolidation,
@@ -31,6 +32,9 @@ consolidationRouter.get('/tracking/:masterTrackingNumber', httpGetConsolidationB
 
 // Update consolidation status
 consolidationRouter.patch('/:id/status', httpUpdateConsolidationStatus);
+
+// Assign driver to consolidation
+consolidationRouter.patch('/:id/assign-driver', httpAssignDriverToConsolidation);
 
 // Add parcel to consolidation
 consolidationRouter.post('/:id/parcels', httpAddParcelToConsolidation);

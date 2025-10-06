@@ -9,7 +9,8 @@ const {
     removeParcelFromConsolidation,
     updateConsolidation,
     deleteConsolidation,
-    consolidationExists
+    consolidationExists,
+    assignDriverToConsolidation
 } = require('../../models/consolidation/consolidation.model');
 
 async function httpCreateConsolidation(req, res) {
@@ -54,7 +55,8 @@ async function httpGetAllConsolidations(req, res) {
         const filters = {
             status: req.query.status,
             warehouseId: req.query.warehouseId,
-            createdBy: req.query.createdBy
+            createdBy: req.query.createdBy,
+            assignedDriver: req.query.assignedDriver
         };
         
         const consolidations = await getAllConsolidations(filters);
@@ -138,7 +140,7 @@ async function httpGetConsolidationByTracking(req, res) {
 async function httpUpdateConsolidationStatus(req, res) {
     try {
         const { id } = req.params;
-        const { status, note } = req.body;
+        const { status, note, location } = req.body;
         
         if (!status) {
             return res.status(400).json({
@@ -146,13 +148,40 @@ async function httpUpdateConsolidationStatus(req, res) {
             });
         }
         
-        const consolidation = await updateConsolidationStatus(id, status, note);
+        const consolidation = await updateConsolidationStatus(id, status, note, location);
         
         return res.status(200).json(consolidation);
     } catch (error) {
         console.error('Error updating consolidation status:', error);
         return res.status(500).json({
             error: 'Failed to update consolidation status',
+            details: error.message
+        });
+    }
+}
+
+async function httpAssignDriverToConsolidation(req, res) {
+    try {
+        const { id } = req.params;
+        const { driverId } = req.body;
+        
+        if (!driverId) {
+            return res.status(400).json({
+                error: 'Driver ID is required'
+            });
+        }
+        
+        const consolidation = await assignDriverToConsolidation(id, driverId);
+        
+        return res.status(200).json({
+            success: true,
+            message: 'Driver assigned successfully',
+            data: consolidation
+        });
+    } catch (error) {
+        console.error('Error assigning driver to consolidation:', error);
+        return res.status(500).json({
+            error: 'Failed to assign driver',
             details: error.message
         });
     }
@@ -256,6 +285,7 @@ module.exports = {
     httpGetConsolidationByReference,
     httpGetConsolidationByTracking,
     httpUpdateConsolidationStatus,
+    httpAssignDriverToConsolidation,
     httpAddParcelToConsolidation,
     httpRemoveParcelFromConsolidation,
     httpUpdateConsolidation,
