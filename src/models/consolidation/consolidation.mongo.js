@@ -1,4 +1,7 @@
 const mongoose = require('mongoose')
+require('../parcel/parcel.mongo')
+require('../user/user.mongo')
+require('../warehouse/warehouse.mongo')
 
 const ConsolidationSchema = new mongoose.Schema({
     masterTrackingNumber: {
