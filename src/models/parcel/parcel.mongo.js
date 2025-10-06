@@ -45,6 +45,7 @@ const ParcelSchema = new mongoose.Schema({
             "created",
             "at_warehouse",
             "consolidated",
+            "assigned_to_driver",
             "in_transit",
             "out_for_delivery",
             "delivered",
@@ -64,6 +65,10 @@ const ParcelSchema = new mongoose.Schema({
             note: String
         }
     ],
+    assignedDriver: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+    },
     warehouseId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Warehouse"
@@ -80,7 +85,6 @@ const ParcelSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     }
-
 })
 
 module.exports = mongoose.model("Parcel", ParcelSchema);

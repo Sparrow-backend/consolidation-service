@@ -16,12 +16,15 @@ const ConsolidationSchema = new mongoose.Schema({
     parcels: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "Parcel"
-    }
-    ],
+    }],
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
         required: true
+    },
+    assignedDriver: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
     },
     warehouseId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -29,8 +32,38 @@ const ConsolidationSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ["pending", "consolidated", "in_transit", "delivered", "cancelled"],
+        enum: [
+            "pending", 
+            "consolidated", 
+            "assigned_to_driver",
+            "in_transit", 
+            "out_for_delivery",
+            "delivered", 
+            "cancelled"
+        ],
         default: "pending"
+    },
+    deliveryStatus: {
+        started: {
+            type: Boolean,
+            default: false
+        },
+        startedAt: Date,
+        startLocation: {
+            latitude: Number,
+            longitude: Number,
+            address: String
+        },
+        ended: {
+            type: Boolean,
+            default: false
+        },
+        endedAt: Date,
+        endLocation: {
+            latitude: Number,
+            longitude: Number,
+            address: String
+        }
     },
     statusHistory: [{
         status: String,
@@ -38,8 +71,17 @@ const ConsolidationSchema = new mongoose.Schema({
             type: Date,
             default: Date.now
         }, 
-        note: String
-    }]
+        note: String,
+        location: {
+            latitude: Number,
+            longitude: Number,
+            address: String
+        }
+    }],
+    createdTimestamp: {
+        type: Date,
+        default: Date.now
+    }
 })
 
 module.exports = mongoose.model("Consolidation", ConsolidationSchema)

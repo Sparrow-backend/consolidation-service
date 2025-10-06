@@ -4,6 +4,7 @@ const cors = require('cors');
 const consolidationRouter = require('./routes/consolidation/consolidation.router');
 const receiptRouter = require('./routes/receipt/receipt.router');
 const requestRouter = require('./routes/request/request.router');
+const deliveryRouter = require('./routes/delivery/delivery.router');
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.get('/health', (req, res) => {
 app.use('/api/consolidations', consolidationRouter);
 app.use('/api/receipts', receiptRouter);
 app.use('/api/requests', requestRouter);
+app.use('/api/deliveries', deliveryRouter);
 
 // 404 Handler
 app.use((req, res) => {
