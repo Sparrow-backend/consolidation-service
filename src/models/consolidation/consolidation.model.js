@@ -1,8 +1,39 @@
 const Consolidation = require('./consolidation.mongo');
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
+// Helper function to generate unique master tracking number
+async function generateMasterTrackingNumber() {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    
+    // Find the last consolidation of the day
+    const startOfDay = new Date(year, date.getMonth(), date.getDate());
+    const endOfDay = new Date(year, date.getMonth(), date.getDate() + 1);
+    
+    const lastConsolidation = await Consolidation.findOne({
+        createdTimestamp: { $gte: startOfDay, $lt: endOfDay },
+        masterTrackingNumber: { $exists: true, $ne: null }
+    }).sort({ createdTimestamp: -1 });
+    
+    let sequence = 1;
+    if (lastConsolidation && lastConsolidation.masterTrackingNumber) {
+        const lastSequence = parseInt(lastConsolidation.masterTrackingNumber.slice(-4));
+        if (!isNaN(lastSequence)) {
+            sequence = lastSequence + 1;
+        }
+    }
+    
+    return `MTN-${year}${month}${day}-${String(sequence).padStart(4, '0')}`;
+}
 
 async function createConsolidation(consolidationData) {
+    // Generate masterTrackingNumber if not provided
+    if (!consolidationData.masterTrackingNumber) {
+        consolidationData.masterTrackingNumber = await generateMasterTrackingNumber();
+    }
+    
     const consolidation = new Consolidation({
         ...consolidationData,
         statusHistory: [{
@@ -20,7 +51,7 @@ async function createConsolidation(consolidationData) {
             userId: consolidationData.createdBy,
             type: 'consolidation_update',
             title: 'Consolidation Created',
-            message: `Consolidation ${consolidation.referenceCode} has been created successfully`,
+            message: `Consolidation ${consolidation.referenceCode} (${consolidation.masterTrackingNumber}) has been created successfully`,
             entityType: 'Consolidation',
             entityId: consolidation._id,
             channels: ['in_app', 'email']
@@ -114,7 +145,7 @@ async function updateConsolidationStatus(id, status, note = '', location = null)
             userId: consolidation.createdBy._id,
             type: 'consolidation_update',
             title: 'Consolidation Status Updated',
-            message: `Consolidation ${consolidation.referenceCode} status changed from ${oldStatus} to ${status}`,
+            message: `Consolidation ${consolidation.referenceCode} (${consolidation.masterTrackingNumber}) status changed from ${oldStatus} to ${status}`,
             entityType: 'Consolidation',
             entityId: consolidation._id,
             channels: ['in_app', 'email']
@@ -127,7 +158,7 @@ async function updateConsolidationStatus(id, status, note = '', location = null)
             userId: consolidation.assignedDriver._id,
             type: 'consolidation_update',
             title: 'Delivery Update',
-            message: `Consolidation ${consolidation.referenceCode} is now ${status.replace('_', ' ')}`,
+            message: `Consolidation ${consolidation.referenceCode} (${consolidation.masterTrackingNumber}) is now ${status.replace('_', ' ')}`,
             entityType: 'Consolidation',
             entityId: consolidation._id,
             channels: ['in_app', 'push']
@@ -207,7 +238,7 @@ async function assignDriverToConsolidation(consolidationId, driverId) {
         userId: driverId,
         type: 'consolidation_update',
         title: 'New Delivery Assigned',
-        message: `You have been assigned consolidation ${consolidation.referenceCode}`,
+        message: `You have been assigned consolidation ${consolidation.referenceCode} (${consolidation.masterTrackingNumber})`,
         entityType: 'Consolidation',
         entityId: consolidation._id,
         channels: ['in_app', 'push', 'email']
@@ -219,7 +250,7 @@ async function assignDriverToConsolidation(consolidationId, driverId) {
             userId: consolidation.createdBy._id,
             type: 'consolidation_update',
             title: 'Driver Assigned',
-            message: `Driver has been assigned to consolidation ${consolidation.referenceCode}`,
+            message: `Driver has been assigned to consolidation ${consolidation.referenceCode} (${consolidation.masterTrackingNumber})`,
             entityType: 'Consolidation',
             entityId: consolidation._id,
             channels: ['in_app']
@@ -262,5 +293,6 @@ module.exports = {
     updateConsolidation,
     deleteConsolidation,
     consolidationExists,
-    assignDriverToConsolidation
+    assignDriverToConsolidation,
+    generateMasterTrackingNumber
 };
