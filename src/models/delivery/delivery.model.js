@@ -1,6 +1,6 @@
 const Delivery = require('./delivery.mongo');
 const Consolidation = require('../consolidation/consolidation.mongo');
-const fetch = require('node-fetch');
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 async function createDelivery(deliveryData) {
     const delivery = new Delivery(deliveryData);

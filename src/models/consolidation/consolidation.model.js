@@ -1,5 +1,6 @@
 const Consolidation = require('./consolidation.mongo');
-const fetch = require('node-fetch');
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+
 
 async function createConsolidation(consolidationData) {
     const consolidation = new Consolidation({
