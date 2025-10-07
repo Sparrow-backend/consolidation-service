@@ -65,10 +65,6 @@ const ParcelSchema = new mongoose.Schema({
             note: String
         }
     ],
-    assignedDriver: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User"
-    },
     warehouseId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Warehouse"
@@ -78,6 +74,10 @@ const ParcelSchema = new mongoose.Schema({
         ref: "Consolidation"
     },
     createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+    },
+    assignedDriver: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User"
     },
